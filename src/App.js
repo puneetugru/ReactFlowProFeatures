@@ -1,128 +1,186 @@
-import { initialNodes, initialEdges } from './components/ModelGraph/nodes-edges.ts';
-import ELK from 'elkjs/lib/elk.bundled.js';
-import React, { useCallback, useLayoutEffect } from 'react';
+import { NodeTypes, RFNodeData, ELKGraph } from './components/ModelGraph/nodes-edges.ts'
+import React, { useEffect } from 'react';
 import {
    ReactFlow,
    Node,
    Edge,
    ReactFlowProvider,
-   addEdge,
-   Panel,
    useNodesState,
    useEdgesState,
-   useReactFlow,
+   Handle,
+   Position,
+   MarkerType,
+   useReactFlow
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-const elk = new ELK();
-
-// Elk has a *huge* amount of options to configure. To see everything you can
-// tweak check out:
-//
-// - https://www.eclipse.org/elk/reference/algorithms.html
-// - https://www.eclipse.org/elk/reference/options.html
-const elkOptions = {
-   'elk.algorithm': 'layered',
-   'elk.layered.spacing.nodeNodeBetweenLayers': '100',
-   'elk.spacing.nodeNode': '80',
-};
-
-const getLayoutedElements = (nodes, edges, options = {}) => {
-   const isHorizontal = options?.['elk.direction'] === 'RIGHT';
-   const graph = {
-      id: 'root',
-      layoutOptions: options,
-      children: nodes.map((node) => ({
-         ...node,
-         // Adjust the target and source handle positions based on the layout
-         // direction.
-         targetPosition: isHorizontal ? 'left' : 'top',
-         sourcePosition: isHorizontal ? 'right' : 'bottom',
-
-         // Hardcode a width and height for elk to use when layouting.
-         width: 150,
-         height: 50,
-      })),
-      edges: edges,
-   };
-
-   return elk
-      .layout(graph)
-      .then((layoutedGraph) => ({
-         nodes: layoutedGraph.children.map((node) => ({
-            ...node,
-            // React Flow expects a position property on the node instead of `x`
-            // and `y` fields.
-            position: { x: node.x, y: node.y },
-         })),
-
-         edges: layoutedGraph.edges,
-      }))
-      .catch(console.error);
-};
+const handleStyle = {
+   opacity: 0
+}
 
 let layoutedNodes: Node[] = [];
 let layoutedEdges: Edge[] = [];
 
-function LayoutFlow() {
-   const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
-   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
-   const { fitView } = useReactFlow();
-
-   const onConnect = useCallback(
-      (params) => setEdges((eds) => addEdge(params, eds)),
-      [],
+function CustomReactFlowNode({ data }: { data: RFNodeData }) {
+   return (
+      <>
+         <Handle type="target" position={Position.Top} id="t" className='rf-handle rf-handle-top' />
+         <Handle type="source" position={Position.Right} id="r" className='rf-handle rf-handle-right' />
+         <Handle type="source" position={Position.Bottom} id="b" className='rf-handle rf-handle-bottom' />
+         <Handle type="target" position={Position.Left} id="l" className='rf-handle rf-handle-left' />
+         <div className="react-flow__node-default" style={data.style}>
+            {data.label}
+         </div>
+      </>
    );
-   const onLayout = useCallback(
-      ({ direction, useInitialNodes = false }) => {
-         const opts = { 'elk.direction': direction, ...elkOptions };
-         // const ns = useInitialNodes ? initialNodes : nodes;
-         const ns = useInitialNodes ? initialNodes : nodes;
-         const es = useInitialNodes ? initialEdges : edges;
+}
 
-         getLayoutedElements(ns, es, opts).then(
-            ({ nodes: layoutedNodes, edges: layoutedEdges }) => {
-               setNodes(layoutedNodes);
-               setEdges(layoutedEdges);
-
-               window.requestAnimationFrame(() => fitView());
-            },
-         );
-      },
-      [nodes, edges],
+function CustomParentNode({ data }: { data: RFNodeData }) {
+   return (
+      <>
+         <Handle type="target" position={Position.Top} id="t" className='rf-handle rf-handle-top' />
+         <Handle type="source" position={Position.Right} id="r" className='rf-handle rf-handle-right' />
+         <Handle type="source" position={Position.Bottom} id="b" className='rf-handle rf-handle-bottom' />
+         <Handle type="target" position={Position.Left} id="l" className='rf-handle rf-handle-left' />
+         <div className="react-flow__node" style={data.style}>
+            {data.label}
+         </div>
+      </>
    );
+}
 
-   // Calculate the initial layout on mount.
-   useLayoutEffect(() => {
-      onLayout({ direction: 'DOWN', useInitialNodes: true });
-   }, []);
+function RootCauseNode({ data }: { data: RFNodeData }) {
+   return (
+      <>
+         <Handle type="target" position={Position.Top} id="t" className='rf-handle rf-handle-top' />
+         <Handle type="source" position={Position.Right} id="r" className='rf-handle rf-handle-right' />
+         <Handle type="source" position={Position.Bottom} id="b" className='rf-handle rf-handle-bottom' />
+         <Handle type="target" position={Position.Left} id="l" className='rf-handle rf-handle-left' />
+         <div className="rc-node react-flow__node-default">
+            <div className='custom-rc' style={{ backgroundColor: data.style?.backgroundColor }}>
+               {data.label}
+            </div>
+            {data.element.map((ele: string) => {
+               return (<div key={ele} className='rc-element'>
+                  {ele}
+               </div>);
+            })}
+         </div>
+      </>
+   );
+}
+
+function SymptomNode({ data }: { data: RFNodeData }) {
+   return (
+      <>
+         <Handle id="t" type="target" position={Position.Top} style={{ top: '0px', ...handleStyle }} />
+         <Handle
+            type="source"
+            position={Position.Right}
+            id="r"
+            style={{ right: '0px', ...handleStyle }}
+         />
+         <Handle type="source" position={Position.Bottom} id="b" style={{ bottom: '0px', ...handleStyle }} />
+         <Handle type="target" position={Position.Left} id="l" style={{ left: '0px', ...handleStyle }} />
+         <div className="symptom-node react-flow__node-default">
+            {data.element.map((ele: string) => {
+               return (<div key={ele} className='symptom-element'>
+                  {ele}
+               </div>);
+            })}
+            <div className='custom-symptom' style={{ backgroundColor: data.style?.backgroundColor }}>
+               {data.label}
+            </div>
+         </div>
+      </>
+   );
+}
+
+function ImpactNode({ data }: { data: RFNodeData }) {
+   return (
+      <>
+         <Handle type="target" position={Position.Top} id="t" className='rf-handle rf-handle-top' />
+         <Handle type="source" position={Position.Right} id="r" className='rf-handle rf-handle-right' />
+         <Handle type="source" position={Position.Bottom} id="b" className='rf-handle rf-handle-bottom' />
+         <Handle type="target" position={Position.Left} id="l" className='rf-handle rf-handle-left' />
+         <div className="react-flow__node-default impact-node">
+            {data.element.map((ele: string) => {
+               return (<div key={ele} className='impact-element'>
+                  {ele}
+               </div>);
+            })}
+            <div className='custom-impact' style={{ backgroundColor: data.style?.backgroundColor }}>
+               {data.label}
+            </div>
+         </div>
+      </>
+   );
+}
+
+const nodeTypes = {
+   [NodeTypes.DEFAULT]: CustomReactFlowNode,
+   [NodeTypes.PARENT]: CustomParentNode,
+   [NodeTypes.RC]: RootCauseNode,
+   [NodeTypes.SYMPTOM]: SymptomNode,
+   [NodeTypes.IMPACT]: ImpactNode
+};
+
+export function ReactFlowFitView() {
+   const reactFlow = useReactFlow();
+   // Auto fitView on graph update
+   setTimeout(() => reactFlow.fitView(), 0);
 
    return (
-      <div style={{ height: 800 }}>
+      null
+   );
+}
+
+function RCFGraphElk() {
+   const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
+   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
+
+   useEffect(() => {
+      const elkGraph = new ELKGraph();
+      elkGraph.getFinalGraph().then(({ nodes, edges }) => {
+         setNodes(nodes);
+         setEdges(edges);
+      });
+   }, [setNodes, setEdges]);
+
+   return (
+      <div style={{ height: '100vh', width: '100vw', border: '2px solid' }}>
          <ReactFlow
             nodes={nodes}
             edges={edges}
-            onConnect={onConnect}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
-            fitView
+            nodeTypes={nodeTypes}
+            nodesDraggable={false}
+            defaultEdgeOptions={defaultEdgeOptions}
+            proOptions={{ hideAttribution: true }}
          >
-            <Panel position="top-right">
-               <button onClick={() => onLayout({ direction: 'DOWN' })}>
-                  vertical layout
-               </button>
-
-               <button onClick={() => onLayout({ direction: 'RIGHT' })}>
-                  horizontal layout
-               </button>
-            </Panel>
+            <ReactFlowFitView />
          </ReactFlow>
       </div>
    );
 }
 
-export default () => (
-   <ReactFlowProvider>
-      <LayoutFlow />
-   </ReactFlowProvider>
-);
+const defaultEdgeOptions = {
+   markerEnd: {
+      type: MarkerType.ArrowClosed,
+      color: '#0'
+   },
+   style: {
+      strokeWidth: 2
+   }
+}
+
+function App() {
+   return (
+      <ReactFlowProvider>
+         < RCFGraphElk />
+      </ReactFlowProvider>
+   );
+
+}
+export default App;

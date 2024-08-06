@@ -1,6 +1,24 @@
-/*eslint no-undef: "error"*/
+import ELK from 'elkjs/lib/elk.bundled.js';
+import { ElkNode, ElkExtendedEdge, LayoutOptions } from 'elkjs/lib/elk-api';
+import { Node, Edge } from "reactflow";
+import { CSSProperties } from "react"
 
-const position = { x: 0, y: 0 };
+
+export const elkOptions = {
+   "elk.algorithm": "mrtree",
+   "elk.layered.spacing.nodeNodeBetweenLayers": "80",
+   "elk.spacing.nodeNode": "80",
+   "elk.layered.wrapping.strategy": "0",
+   "elk.separateConnectedComponents": "false",
+   "elk.nodeLabels.placement": "0",
+};
+
+const elk = new ELK();
+
+export enum SUBGRAPHID {
+   ELEMENTS = 'elements',
+   TEMPLATES = 'templates'
+}
 
 export const intermediateData = {
    "element": {
@@ -438,90 +456,385 @@ export const intermediateData = {
    }
 };
 
-// export const initialNodes = [
-//    {
-//       id: '1',
-//       type: 'input',
-//       data: { label: 'input' },
-//       position,
-//    },
-//    {
-//       id: '2',
-//       data: { label: 'node 2' },
-//       position,
-//    },
-//    {
-//       id: '2a',
-//       data: { label: 'node 2a' },
-//       position,
-//    },
-//    {
-//       id: '2b',
-//       data: { label: 'node 2b' },
-//       position,
-//    },
-//    {
-//       id: '2c',
-//       data: { label: 'node 2c' },
-//       position,
-//    },
-//    {
-//       id: '2d',
-//       data: { label: 'node 2d' },
-//       position,
-//    },
-//    {
-//       id: '3',
-//       data: { label: 'node 3' },
-//       position,
-//    },
-//    {
-//       id: '4',
-//       data: { label: 'node 4' },
-//       position,
-//    },
-//    {
-//       id: '5',
-//       data: { label: 'node 5' },
-//       position,
-//    },
-//    {
-//       id: '6',
-//       type: 'output',
-//       data: { label: 'output' },
-//       position,
-//    },
-//    { id: '7', type: 'output', data: { label: 'output' }, position },
-// ];
+export interface RFNodeData {
+   label: string,
+   element: string[],
+   style: CSSProperties
+}
 
-export const initialEdges = [
-   // { id: 'e12', source: '1', target: '2', type: 'smoothstep' },
-   // { id: 'e13', source: '1', target: '3', type: 'smoothstep' },
-   // { id: 'e22a', source: '2', target: '2a', type: 'smoothstep' },
-   // { id: 'e22b', source: '2', target: '2b', type: 'smoothstep' },
-   // { id: 'e22c', source: '2', target: '2c', type: 'smoothstep' },
-   // { id: 'e2c2d', source: '2c', target: '2d', type: 'smoothstep' },
-   // { id: 'e45', source: '4', target: '5', type: 'smoothstep' },
-   // { id: 'e56', source: '5', target: '6', type: 'smoothstep' },
-   // { id: 'e57', source: '5', target: '7', type: 'smoothstep' },
-];
+export enum NodeTypes {
+   DEFAULT = 'customNode',
+   HEX = 'customHex',
+   ROOTCAUSE = 'customRootCause',
+   SYMPTOM = 'Symptom',
+   RC = 'RootCause',
+   IMPACT = 'Impact',
+   OVAL = 'customOval',
+   PARENT = 'customParent'
+}
 
-// export function getElementTypeMap () {
-//    let elementTypeMap = new Map ();
-//    for (const elementTypeId in intermediateData.elementType) {
-//       elementTypeMap.set(
-//          elementTypeId, intermediateData.elementType[elementTypeId].name
-//       );
-//    }
-//    return elementTypeMap;
-// };
+export interface RCFGraphNode {
+   id: string,
+   label?: string,
+   element?: string | string[],
+   type?: string,
+   height?: number,
+   style?: CSSProperties,
+   startBracket?: string,
+   endBracket?: string
+}
 
-export const initialNodes = []
-for (const elementTypeId in intermediateData.elementType) {
-   initialNodes.push({
-      id: elementTypeId,
-      type: 'input',
-      data: { label: intermediateData.elementType[elementTypeId].name},
-      position
-   })
+export interface RCFGraphEdge {
+   source: string,
+   target: string,
+   label?: string,
+   type?: string,
+   sourceHandle?: string,
+   targetHandle?: string
+}
+
+export class ELKGraph {
+
+   initialPosition = { x: 0, y: 0 }
+
+   /**
+   * Get reactflow nodes given elements
+   * @param {RCFGraphNode[]} nodes
+   * @param {string} parentNode
+   * @returns {Node[]}
+   */
+   getElementNodes = (elements: Map<string, Object>, elementTypes: Map<string, Object>, parentNode: string): Node[] => {
+      const elementNodes: Node[] = [];
+      elements.forEach((value, key) => {
+         if (value.componentOf === 'WORLD') {
+            let elementTypeName = elementTypes.get(value.typeId).name
+            elementNodes.push(
+               {
+                  id: key,
+                  data: {
+                     label: value.name+':'+elementTypeName,
+                     element: value.element,
+                     style: { backgroundColor: '#F16913' }
+                  },
+                  position: this.initialPosition,
+                  height: 40,
+                  parentNode,
+               }
+            )
+         }
+      });
+      return elementNodes;
+   }
+
+   /**
+   * Get reactflow nodes given elements
+   * @param {RCFGraphNode[]} nodes
+   * @param {string} parentNode
+   * @returns {Node[]}
+   */
+   getElementTypeNodes = (elementTypes: Map<string, Object>, parentNode: string): Node[] => {
+      const elementTypeNodes: Node[] = [];
+      elementTypes.forEach((value, key) => {
+         elementTypeNodes.push(
+            {
+               id: key,
+               data: {
+                  label: value.name,
+                  element: value.element,
+                  style: { backgroundColor: '#F16913' }
+               },
+               position: this.initialPosition,
+               height: 40,
+               parentNode,
+            }
+         )
+      });
+      return elementTypeNodes;
+   }
+
+   /**
+   * Get reactflow edges given CustomEdges
+   * @param {RCFGraphEdge[]} edges
+   * @returns {Edge[]}
+   */
+   getRFEdges = (edges: RCFGraphEdge[]): Edge[] => {
+      const rfEdges: Edge[] = [];
+      edges.forEach((edge) => {
+      rfEdges.push(
+         {
+            id: edge.source.concat(edge.target),
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle,
+            targetHandle: edge.targetHandle,
+            label: edge.label,
+            type: edge.type
+         }
+      )
+      })
+      return rfEdges;
+   }
+
+   /**
+   * Get final graph from elkgraph
+   * @returns {Promise<{nodes: Node[], edges: Edge[]}>}
+   */
+   getFinalGraph = async () : Promise<{nodes: Node[], edges: Edge[]}> => {
+
+      const intermediateDataMap = new Map(Object.entries(intermediateData))
+      const elements = intermediateDataMap.get('element')
+      const elementMap = new Map(Object.entries(elements))
+      const elementTypes = intermediateDataMap.get('elementType')
+      const elementTypesMap = new Map(Object.entries(elementTypes))
+
+      const elementNodes = this.getElementNodes(elementMap, elementTypesMap, SUBGRAPHID.ELEMENTS);
+      const elementTypesNodes = this.getElementTypeNodes(elementTypesMap, SUBGRAPHID.TEMPLATES);
+
+      // const elementTypeEdges = this.getRFEdges(this.rcfGraph.elementTypeEdges);
+      // const elementEdges = this.getRFEdges(this.rcfGraph.elementEdges);
+      const elementTypeEdges = []
+      const elementEdges = []
+
+      // const elementTypeChild = this.createElkChild(elementTypesNodes,
+      //    elementTypeEdges, SUBGRAPHID.TEMPLATES,
+      //    { 'elk.direction': 'DOWN', ...elkOptions });
+      const elementTypeChild = this.createElkChild(elementTypesNodes,
+         elementTypeEdges, SUBGRAPHID.TEMPLATES,
+         {});
+
+      // const elementChild = this.createElkChild(elementNodes,
+      //    elementEdges, SUBGRAPHID.ELEMENTS,
+      //    { 'elk.direction': 'DOWN', ...elkOptions });
+      const elementChild = this.createElkChild(elementNodes,
+         elementEdges, SUBGRAPHID.ELEMENTS,
+         {});
+
+      const commonEdges = this.getRFEdges([]);
+
+      let rootElkChildren: ElkNode[] = [];
+
+      if (elementTypeChild) {
+         rootElkChildren.push(elementTypeChild);
+         // tmpEdges.push(
+         //    {
+         //       id: 'RCFImp',
+         //       source: SUBGRAPHID.RCF,
+         //       target: SUBGRAPHID.IMPACT
+         //    }
+         // )
+      }
+
+      if (elementChild) {
+         rootElkChildren.push(elementChild);
+      }
+
+      const rootElkGraph = await this.getRootElkGraph(rootElkChildren,
+      // commonEdges.concat([]), { 'elk.direction': 'DOWN', ...elkOptions });
+      commonEdges.concat([]), {});
+      console.log("RootElkGraph is: "+JSON.stringify(rootElkGraph, null, 4))
+
+      const nodes = this.getLayoutedElements(rootElkGraph, elementNodes, elementTypesNodes);
+      const edges = elementTypeEdges.concat(elementEdges).concat(commonEdges);
+      return { nodes, edges };
+   }
+
+   /**
+   * Create elk subgraph
+   * @param {Node[]} nodes
+   * @param {Edge[]} edges
+   * @param {string} graphId
+   * @param {LayoutOptions} options
+   * @returns {ElkNode | undefined}
+   */
+   createElkChild = (nodes: Node[], edges: Edge[], graphId: string,
+      options: LayoutOptions = {}): ElkNode | undefined => {
+      if (nodes.length === 0) {
+         return;
+      }
+      const elkEdges: ElkExtendedEdge[] = this.getElkEdges(edges);
+      const elkNodes: ElkNode[] = this.getElkNodes(nodes);
+      const graph: ElkNode = {
+         id: graphId,
+         layoutOptions: options,
+         children: elkNodes,
+         edges: elkEdges,
+         labels: [{ text: graphId }]
+      };
+      return graph
+   }
+
+   /**
+   * Get elk nodes given reactflow nodes
+   * @param {Node[]} nodes
+   * @param {number} [width=150]
+   * @param {number} [height=40]
+   * @returns {ElkNode[]}
+   */
+   getElkNodes = (nodes: Node[], width: number = 160, height: number = 60): ElkNode[] => {
+      const elkNodes: ElkNode[] = [];
+      nodes.forEach((node) => {
+      elkNodes.push(
+         {
+            id: node.id,
+            width: width,
+            height: node.height ?? height,
+            labels: [{ text: node.data.label }]
+         }
+      )
+      });
+      return elkNodes;
+   }
+
+   /**
+   * Get elk edges given reactflow edges
+   * @param {Edge[]} edges - array of reactflow edges
+   * @returns {ElkExtendedEdge[]}
+   */
+   getElkEdges = (edges: Edge[]): ElkExtendedEdge[] => {
+      const rootElkEdges: ElkExtendedEdge[] = [];
+      edges.forEach((edge) => {
+         rootElkEdges.push(
+            {
+               id: edge.source.concat(edge.target),
+               sources: [edge.source],
+               targets: [edge.target]
+            }
+         )
+      })
+      return rootElkEdges;
+   }
+
+   /**
+   * Get ElkNode from id
+   * @param {ElkNode[] | undefined} nodes
+   * @param {string} nodeId
+   * @returns {ElkNode | undefined} - ElkNode if found else undefined
+   */
+   getNodeFromId = (nodes: ElkNode[] | undefined, nodeId: string): ElkNode | undefined => {
+      if (!nodes) {
+         return;
+      }
+      for (const node of nodes) {
+         if (node.id === nodeId) {
+            return node;
+         }
+      }
+   }
+
+   /**
+   * Get a reactflow node from elk node
+   * @param {ElkNode} elkNode
+   * @param {object} data
+   * @param {CSSProperties | undefined} style
+   * @param {string | undefined} type
+   * @param {string | undefined} parent
+   * @returns {Node} - reactflow node
+   */
+   getNodeFromElkNode = (elkNode: ElkNode, data: object, style: CSSProperties | undefined = undefined,
+      type: string | undefined = undefined, parent: string | undefined = undefined): Node => {
+
+      const node: Node = {
+         id: elkNode.id,
+         position: {
+            x: elkNode.x ? elkNode.x : 0,
+            y: elkNode.y ? elkNode.y : 0
+         },
+         data,
+         // style: { width: elkNode.width, height: elkNode.height, ...style },
+         style: { width: elkNode.width, height: parent? undefined : elkNode.height, ...style },
+         parentNode: parent,
+         type
+      }
+      return node;
+   }
+
+   /**
+   * Populate reactflow nodes using ElkNode properties
+   * @param {ElkNode[]} elkNodes
+   * @param {Node[]} rfNodes
+   * @returns {Node[]} - array of reactflow nodes
+   */
+   populateNodes = (elkNodes: ElkNode[], rfNodes: Node[]): Node[] => {
+      let nodes: Node[] = [];
+      rfNodes.forEach((node) => {
+      const elkNode = this.getNodeFromId(elkNodes, node.id);
+      if (elkNode) {
+         nodes.push(this.getNodeFromElkNode(elkNode, node.data, node.style, node.type, node.parentNode))
+      }
+      return node;
+      });
+      return nodes;
+   }
+
+
+   /**
+   * Get sub graph nodes of elkgraph
+   * @param {ElkNode | undefined} subgraph
+   * @param {string} subGraphLabel
+   * @param {Node[]} childNodes
+   * @param {CSSProperties} groupStyle
+   * @returns {Node[]} - array of ReactFlow Nodes
+   */
+   getSubGraphNodes = (subgraph: ElkNode | undefined, subGraphLabel: string,
+      childNodes: Node[], groupStyle: CSSProperties): Node[] => {
+      let nodes: Node[] = [];
+      if (subgraph) {
+         // Width correction
+         subgraph.width = subgraph.width ? subgraph.width + 15 : 0;
+         subgraph.height = subgraph.height ? subgraph.height + 40 : 0;
+         nodes.push(this.getNodeFromElkNode(subgraph, { label: subGraphLabel }, groupStyle, NodeTypes.PARENT));
+         if (subgraph.children) {
+            nodes = nodes.concat(this.populateNodes(subgraph.children, childNodes));
+         }
+      }
+      // console.log("Nodes are: "+JSON.stringify(nodes, null, 4))
+      return nodes;
+   }
+
+
+   /**
+   * Get layouted elements of elkgraph
+   * @param {ElkNode} rootElkGraph
+   * @param {Node[]} symptomNodes
+   * @param {Node[]} rcfNodes
+   * @param {Node[]} impactNodes
+   * @returns {Node[]} - array for Node objects
+   */
+   getLayoutedElements = (rootElkGraph: ElkNode, elementNodes: Node[],
+      elementTypeNodes: Node[]): Node[] => {
+      let nodes: Node[] = [];
+      const elementNode = this.getNodeFromId(rootElkGraph.children, SUBGRAPHID.ELEMENTS);
+      // console.log("Element Node collection is: "+JSON.stringify(elementNode, null, 4))
+      const elementTypeNode = this.getNodeFromId(rootElkGraph.children, SUBGRAPHID.TEMPLATES);
+      // console.log("Element Type Node collection is: "+JSON.stringify(elementTypeNode, null, 4))
+      let groupStyle: CSSProperties = { backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      border: '1px solid black' };
+      nodes = this.getSubGraphNodes(elementNode, 'Elements', elementNodes, {...groupStyle,translate: '0 -10px'});
+      nodes = nodes.concat(this.getSubGraphNodes(elementTypeNode, 'Templates',
+      elementTypeNodes, {...groupStyle,translate: '20 -30px'}));
+      return nodes;
+   }
+
+
+   /**
+   * Get layouted graph from sub graphs of elkgraph
+   * @param {ElkNode[]} rootElkChildren
+   * @param {Edge[]} edges
+   * @param {LayoutOptions} options - graph layout options
+   * @returns {Promise<ElkNode>} - layouted ElkNode
+   */
+   getRootElkGraph = async (rootElkChildren: ElkNode[], edges: Edge[],
+      options: LayoutOptions = {})
+      : Promise<ElkNode> => {
+      const rootElkEdges: ElkExtendedEdge[] = this.getElkEdges(edges);
+      const graph: ElkNode = {
+         id: 'root',
+         layoutOptions: options,
+         children: rootElkChildren,
+         edges: rootElkEdges,
+      };
+
+      const rootElkGraph = await elk.layout(graph);
+      return rootElkGraph
+   }
 }
