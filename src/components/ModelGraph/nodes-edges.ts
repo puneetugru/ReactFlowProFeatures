@@ -462,6 +462,23 @@ export interface RFNodeData {
    style: CSSProperties
 }
 
+export interface SymptomDetails {
+   id: string,
+   name: string,
+   rootCauseName?: string,
+   probability: number
+}
+
+export interface ElementTypeNode {
+   id: string,
+   label?: string,
+   position?: {x: number, y: number},
+   height?: number,
+   parentNode?: string,
+   symptoms?: SymptomDetails[],
+   components?: string[]
+}
+
 export enum NodeTypes {
    DEFAULT = 'customNode',
    HEX = 'customHex',
@@ -532,22 +549,30 @@ export class ELKGraph {
    * @param {string} parentNode
    * @returns {Node[]}
    */
-   getElementTypeNodes = (elementTypes: Map<string, Object>, parentNode: string): Node[] => {
-      const elementTypeNodes: Node[] = [];
+   getElementTypeNodes = (elementTypes: Map<string, Object>, parentNode: string): ElementTypeNode[] => {
+      const elementTypeNodes: ElementTypeNode[] = [];
       elementTypes.forEach((value, key) => {
-         elementTypeNodes.push(
-            {
-               id: key,
-               data: {
-                  label: value.name,
-                  element: value.element,
-                  style: { backgroundColor: '#F16913' }
-               },
-               position: this.initialPosition,
-               height: 40,
-               parentNode,
-            }
-         )
+         var node = <ElementTypeNode>{}
+         node.id = key
+         node.label = value.name
+         node.position = this.initialPosition
+         node.height = 40
+         node.parentNode = parentNode
+         node.symptoms = []
+         // Check whether symptom is present in the elementType
+         // If yes, add them as the children to the node
+         if (JSON.stringify(value.symptom) != '{}') {
+            const symptomMap = new Map(Object.entries(value.symptom))
+            // console.log("symptom map is: " + JSON.stringify([...symptomMap.entries()]))
+            symptomMap.forEach((value, key) => {
+               var symptomDetail = <SymptomDetails>{}
+               symptomDetail.id = key
+               symptomDetail.name = value.name
+               node.symptoms.push(symptomDetail)
+            });
+         }
+         // console.log("node is: " + JSON.stringify(node))
+         elementTypeNodes.push(node)
       });
       return elementTypeNodes;
    }
@@ -598,16 +623,15 @@ export class ELKGraph {
       // const elementTypeChild = this.createElkChild(elementTypesNodes,
       //    elementTypeEdges, SUBGRAPHID.TEMPLATES,
       //    { 'elk.direction': 'DOWN', ...elkOptions });
-      const elementTypeChild = this.createElkChild(elementTypesNodes,
-         elementTypeEdges, SUBGRAPHID.TEMPLATES,
-         {});
-
-      // const elementChild = this.createElkChild(elementNodes,
+      const elementTypeChild = this.createElementTypeElkChild(elementTypesNodes,
+         SUBGRAPHID.TEMPLATES, { 'algorithm': 'layered' });
+      // console.log("elementTypeChild is: "+JSON.stringify(elementTypeChild, null, 4))
+      // const elementTypeChild = this.createElkChild(elementTypeNodes,
       //    elementEdges, SUBGRAPHID.ELEMENTS,
-      //    { 'elk.direction': 'DOWN', ...elkOptions });
+      //    { 'algorithm': 'layered' });
       const elementChild = this.createElkChild(elementNodes,
          elementEdges, SUBGRAPHID.ELEMENTS,
-         {});
+         { 'algorithm': 'layered' });
 
       const commonEdges = this.getRFEdges([]);
 
@@ -630,12 +654,52 @@ export class ELKGraph {
 
       const rootElkGraph = await this.getRootElkGraph(rootElkChildren,
       // commonEdges.concat([]), { 'elk.direction': 'DOWN', ...elkOptions });
-      commonEdges.concat([]), {});
+      commonEdges.concat([]), { 'algorithm': 'layered' });
       console.log("RootElkGraph is: "+JSON.stringify(rootElkGraph, null, 4))
 
       const nodes = this.getLayoutedElements(rootElkGraph, elementNodes, elementTypesNodes);
       const edges = elementTypeEdges.concat(elementEdges).concat(commonEdges);
       return { nodes, edges };
+   }
+
+   getChildNodes = (symptoms: SymptomDetails[], width: number = 60, height: number = 60): ElkNode[] => {
+      const elkNodes: ElkNode[] = [];
+      symptoms.forEach((symptom) => {
+      elkNodes.push(
+         {
+            id: symptom.id,
+            width: width,
+            height: height,
+            labels: [{ text: symptom.name }]
+         }
+      )
+      });
+      return elkNodes;
+   }
+
+   createElementTypeElkChild = (nodes: ElementTypeNode[], graphId: string,
+      options: LayoutOptions = { 'algorithm': 'layered' }): ElkNode | undefined => {
+      if (nodes.length === 0) {
+         return;
+      }
+      const elementTypeNodes: ElkNode[] = [];
+      nodes.forEach((node) => {
+         const childNodes = this.getChildNodes(node.symptoms);
+         const graph = {
+               id: node.id,
+               layoutOptions: options,
+               children: childNodes,
+               labels: [{ text: node.label }]
+            }
+         elementTypeNodes.push(graph)
+      });
+      const graph: ElkNode = {
+         id: graphId,
+         layoutOptions: options,
+         children: elementTypeNodes,
+         labels: [{ text: graphId }]
+      };
+      return graph
    }
 
    /**
