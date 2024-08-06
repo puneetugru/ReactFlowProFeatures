@@ -1,8 +1,10 @@
-import { initialNodes, initialEdges } from './components/ModelGraph/nodes-edges.js';
+import { initialNodes, initialEdges } from './components/ModelGraph/nodes-edges.ts';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import React, { useCallback, useLayoutEffect } from 'react';
 import {
    ReactFlow,
+   Node,
+   Edge,
    ReactFlowProvider,
    addEdge,
    Panel,
@@ -59,9 +61,12 @@ const getLayoutedElements = (nodes, edges, options = {}) => {
       .catch(console.error);
 };
 
+let layoutedNodes: Node[] = [];
+let layoutedEdges: Edge[] = [];
+
 function LayoutFlow() {
-   const [nodes, setNodes, onNodesChange] = useNodesState([]);
-   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+   const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
+   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
    const { fitView } = useReactFlow();
 
    const onConnect = useCallback(
@@ -71,6 +76,7 @@ function LayoutFlow() {
    const onLayout = useCallback(
       ({ direction, useInitialNodes = false }) => {
          const opts = { 'elk.direction': direction, ...elkOptions };
+         // const ns = useInitialNodes ? initialNodes : nodes;
          const ns = useInitialNodes ? initialNodes : nodes;
          const es = useInitialNodes ? initialEdges : edges;
 
