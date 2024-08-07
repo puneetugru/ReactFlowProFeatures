@@ -17,7 +17,8 @@ const elk = new ELK();
 
 export enum SUBGRAPHID {
    ELEMENTS = 'elements',
-   TEMPLATES = 'templates'
+   TEMPLATES = 'templates',
+   SYMPTOMS = 'symptoms'
 }
 
 export const intermediateData = {
@@ -490,17 +491,6 @@ export enum NodeTypes {
    PARENT = 'customParent'
 }
 
-export interface RCFGraphNode {
-   id: string,
-   label?: string,
-   element?: string | string[],
-   type?: string,
-   height?: number,
-   style?: CSSProperties,
-   startBracket?: string,
-   endBracket?: string
-}
-
 export interface RCFGraphEdge {
    source: string,
    target: string,
@@ -516,11 +506,11 @@ export class ELKGraph {
 
    /**
    * Get reactflow nodes given elements
-   * @param {RCFGraphNode[]} nodes
+   * @param {ElementTypeNode[]} nodes
    * @param {string} parentNode
    * @returns {Node[]}
    */
-   getElementNodes = (elements: Map<string, Object>, elementTypes: Map<string, Object>, parentNode: string): Node[] => {
+   createNodesForElements = (elements: Map<string, Object>, elementTypes: Map<string, Object>, parentNode: string): Node[] => {
       const elementNodes: Node[] = [];
       elements.forEach((value, key) => {
          if (value.componentOf === 'WORLD') {
@@ -530,7 +520,6 @@ export class ELKGraph {
                   id: key,
                   data: {
                      label: value.name+':'+elementTypeName,
-                     element: value.element,
                      style: { backgroundColor: '#F16913' }
                   },
                   position: this.initialPosition,
@@ -543,7 +532,7 @@ export class ELKGraph {
       return elementNodes;
    }
 
-   getElementTypeNodes = (elementTypes: Map<string, Object>, parentNode: string): Node[] => {
+   createNodesForElementTypes = (elementTypes: Map<string, Object>, parentNode: string): Node[] => {
       const elementTypeNodes: Node[] = [];
       elementTypes.forEach((value, key) => {
          elementTypeNodes.push(
@@ -562,9 +551,33 @@ export class ELKGraph {
       return elementTypeNodes;
    }
 
+   createNodesForSymptoms = (elementTypes: Map<string, Object>): Node[] => {
+      const symptomNodes: Node[] = [];
+      elementTypes.forEach((value, elementTypekey) => {
+         if (JSON.stringify(value.symptom) != '{}') {
+            const symptomMap = new Map(Object.entries(value.symptom))
+            symptomMap.forEach((value, key) => {
+               symptomNodes.push(
+                  {
+                     id: key,
+                     data: {
+                        label: value.name,
+                        style: { backgroundColor: '#F16913' }
+                     },
+                     position: this.initialPosition,
+                     height: 40,
+                     parentNode: elementTypekey,
+                  }
+               )
+            });
+         }
+      });
+      return symptomNodes;
+   }
+
    /**
    * Get reactflow nodes given elements
-   * @param {RCFGraphNode[]} nodes
+   * @param {ElementTypeNode[]} nodes
    * @param {string} parentNode
    * @returns {Node[]}
    */
@@ -626,32 +639,27 @@ export class ELKGraph {
    getFinalGraph = async () : Promise<{nodes: Node[], edges: Edge[]}> => {
 
       const intermediateDataMap = new Map(Object.entries(intermediateData))
+
       const elements = intermediateDataMap.get('element')
       const elementMap = new Map(Object.entries(elements))
+
       const elementTypes = intermediateDataMap.get('elementType')
       const elementTypesMap = new Map(Object.entries(elementTypes))
 
-      const elementNodes = this.getElementNodes(elementMap, elementTypesMap, SUBGRAPHID.ELEMENTS);
-      const elementTypeNodes = this.getElementTypeNodes(elementTypesMap, SUBGRAPHID.TEMPLATES);
+      const elementNodes = this.createNodesForElements(elementMap, elementTypesMap, SUBGRAPHID.ELEMENTS);
+      const elementTypeNodes = this.createNodesForElementTypes(elementTypesMap, SUBGRAPHID.TEMPLATES);
+      const symptomNodes = this.createNodesForSymptoms(elementTypesMap);
+
       const elementTypeSubGraph = this.getElementTypeSubGraph(elementTypesMap, SUBGRAPHID.TEMPLATES);
 
-      // const elementTypeEdges = this.getRFEdges(this.rcfGraph.elementTypeEdges);
-      // const elementEdges = this.getRFEdges(this.rcfGraph.elementEdges);
       const elementTypeEdges = []
       const elementEdges = []
 
-      // const elementTypeChild = this.createElkChild(elementTypesNodes,
-      //    elementTypeEdges, SUBGRAPHID.TEMPLATES,
-      //    { 'elk.direction': 'DOWN', ...elkOptions });
       const elementTypeChild = this.createElementTypeElkChild(elementTypeSubGraph,
-         SUBGRAPHID.TEMPLATES, { 'algorithm': 'layered' });
-      // console.log("elementTypeChild is: "+JSON.stringify(elementTypeChild, null, 4))
-      // const elementTypeChild = this.createElkChild(elementTypeNodes,
-      //    elementEdges, SUBGRAPHID.ELEMENTS,
-      //    { 'algorithm': 'layered' });
+         SUBGRAPHID.TEMPLATES, { 'elk.direction': 'DOWN', ...elkOptions, 'elk.algorithm': 'layered' });
       const elementChild = this.createElkChild(elementNodes,
          elementEdges, SUBGRAPHID.ELEMENTS,
-         { 'algorithm': 'layered' });
+         { 'elk.direction': 'DOWN', ...elkOptions, 'elk.algorithm': 'layered' });
 
       const commonEdges = this.getRFEdges([]);
 
@@ -673,11 +681,11 @@ export class ELKGraph {
       }
 
       const rootElkGraph = await this.getRootElkGraph(rootElkChildren,
-      // commonEdges.concat([]), { 'elk.direction': 'DOWN', ...elkOptions });
-      commonEdges.concat([]), { 'algorithm': 'layered' });
-      console.log("RootElkGraph is: "+JSON.stringify(rootElkGraph, null, 4))
+         commonEdges.concat([]), { 'elk.direction': 'DOWN', ...elkOptions });
+      console.log("RootElkGraph is: " + JSON.stringify(rootElkGraph, null, 4))
 
-      const nodes = this.getLayoutedElements(rootElkGraph, elementNodes, elementTypeNodes);
+      const nodes = this.getFinalNodes(rootElkGraph, elementNodes, elementTypeNodes, symptomNodes);
+      console.log("Nodes are: ", nodes)
       const edges = elementTypeEdges.concat(elementEdges).concat(commonEdges);
       return { nodes, edges };
    }
@@ -884,18 +892,21 @@ export class ELKGraph {
    * @param {Node[]} impactNodes
    * @returns {Node[]} - array for Node objects
    */
-   getLayoutedElements = (rootElkGraph: ElkNode, elementNodes: Node[],
-      elementTypeNodes: Node[]): Node[] => {
+   getFinalNodes = (rootElkGraph: ElkNode, elementNodes: Node[],
+      elementTypeNodes: Node[], symptomNodes: Node[]): Node[] => {
       let nodes: Node[] = [];
-      const elementNode = this.getNodeFromId(rootElkGraph.children, SUBGRAPHID.ELEMENTS);
-      // console.log("Element Node collection is: "+JSON.stringify(elementNode, null, 4))
-      const elementTypeNode = this.getNodeFromId(rootElkGraph.children, SUBGRAPHID.TEMPLATES);
-      // console.log("Element Type Node collection is: "+JSON.stringify(elementTypeNode, null, 4))
+      const elementNodeCollection = this.getNodeFromId(rootElkGraph.children, SUBGRAPHID.ELEMENTS);
+      const elementTypeNodeCollection = this.getNodeFromId(rootElkGraph.children, SUBGRAPHID.TEMPLATES);
+      const symptomNodeCollection = this.getNodeFromId(rootElkGraph.children, SUBGRAPHID.SYMPTOMS);
       let groupStyle: CSSProperties = { backgroundColor: 'rgba(255, 255, 255, 0.2)',
       border: '1px solid black' };
-      nodes = this.getSubGraphNodes(elementNode, 'Elements', elementNodes, {...groupStyle,translate: '0 -10px'});
-      nodes = nodes.concat(this.getSubGraphNodes(elementTypeNode, 'Templates',
-      elementTypeNodes, {...groupStyle,translate: '20 -30px'}));
+      elementNodes = this.getSubGraphNodes(elementNodeCollection, 'Elements',
+         elementNodes, {...groupStyle,translate: '0 -10px'});
+      elementTypeNodes = this.getSubGraphNodes(elementTypeNodeCollection, 'Templates',
+         elementTypeNodes, {...groupStyle,translate: '0 -10px'})
+      symptomNodes = this.getSubGraphNodes(symptomNodeCollection, 'Templates',
+         elementTypeNodes, {...groupStyle,translate: '0 -10px'})
+      nodes = elementNodes.concat(elementTypeNodes).concat(symptomNodes);
       return nodes;
    }
 

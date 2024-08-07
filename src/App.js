@@ -21,7 +21,7 @@ const handleStyle = {
 let layoutedNodes: Node[] = [];
 let layoutedEdges: Edge[] = [];
 
-function CustomReactFlowNode({ data }: { data: RFNodeData }) {
+function CustomReactFlowNode({ data }) {
    return (
       <>
          <Handle type="target" position={Position.Top} id="t" className='rf-handle rf-handle-top' />
@@ -35,7 +35,7 @@ function CustomReactFlowNode({ data }: { data: RFNodeData }) {
    );
 }
 
-function CustomParentNode({ data }: { data: RFNodeData }) {
+function CustomParentNode({ data }) {
    return (
       <>
          <Handle type="target" position={Position.Top} id="t" className='rf-handle rf-handle-top' />
@@ -49,7 +49,7 @@ function CustomParentNode({ data }: { data: RFNodeData }) {
    );
 }
 
-function RootCauseNode({ data }: { data: RFNodeData }) {
+function RootCauseNode({ data }) {
    return (
       <>
          <Handle type="target" position={Position.Top} id="t" className='rf-handle rf-handle-top' />
@@ -60,7 +60,7 @@ function RootCauseNode({ data }: { data: RFNodeData }) {
             <div className='custom-rc' style={{ backgroundColor: data.style?.backgroundColor }}>
                {data.label}
             </div>
-            {data.element.map((ele: string) => {
+            {data.element.map((ele) => {
                return (<div key={ele} className='rc-element'>
                   {ele}
                </div>);
@@ -70,7 +70,7 @@ function RootCauseNode({ data }: { data: RFNodeData }) {
    );
 }
 
-function SymptomNode({ data }: { data: RFNodeData }) {
+function SymptomNode({ data }) {
    return (
       <>
          <Handle id="t" type="target" position={Position.Top} style={{ top: '0px', ...handleStyle }} />
@@ -83,7 +83,7 @@ function SymptomNode({ data }: { data: RFNodeData }) {
          <Handle type="source" position={Position.Bottom} id="b" style={{ bottom: '0px', ...handleStyle }} />
          <Handle type="target" position={Position.Left} id="l" style={{ left: '0px', ...handleStyle }} />
          <div className="symptom-node react-flow__node-default">
-            {data.element.map((ele: string) => {
+            {data.element.map((ele) => {
                return (<div key={ele} className='symptom-element'>
                   {ele}
                </div>);
@@ -96,7 +96,7 @@ function SymptomNode({ data }: { data: RFNodeData }) {
    );
 }
 
-function ImpactNode({ data }: { data: RFNodeData }) {
+function ImpactNode({ data }) {
    return (
       <>
          <Handle type="target" position={Position.Top} id="t" className='rf-handle rf-handle-top' />
@@ -104,7 +104,7 @@ function ImpactNode({ data }: { data: RFNodeData }) {
          <Handle type="source" position={Position.Bottom} id="b" className='rf-handle rf-handle-bottom' />
          <Handle type="target" position={Position.Left} id="l" className='rf-handle rf-handle-left' />
          <div className="react-flow__node-default impact-node">
-            {data.element.map((ele: string) => {
+            {data.element.map((ele) => {
                return (<div key={ele} className='impact-element'>
                   {ele}
                </div>);
