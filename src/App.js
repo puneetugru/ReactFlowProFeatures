@@ -148,7 +148,7 @@ function RCFGraphElk() {
    }, [setNodes, setEdges]);
 
    return (
-      <div style={{ height: '100vh', width: '100vw', border: '2px solid' }}>
+      <div style={{ height: '80vh', width: '80vw', border: '2px solid' }}>
          <ReactFlow
             nodes={nodes}
             edges={edges}

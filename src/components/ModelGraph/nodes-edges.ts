@@ -543,13 +543,32 @@ export class ELKGraph {
       return elementNodes;
    }
 
+   getElementTypeNodes = (elementTypes: Map<string, Object>, parentNode: string): Node[] => {
+      const elementTypeNodes: Node[] = [];
+      elementTypes.forEach((value, key) => {
+         elementTypeNodes.push(
+            {
+               id: key,
+               data: {
+                  label: value.name,
+                  style: { backgroundColor: '#F16913' }
+               },
+               position: this.initialPosition,
+               height: 40,
+               parentNode,
+            }
+         )
+      });
+      return elementTypeNodes;
+   }
+
    /**
    * Get reactflow nodes given elements
    * @param {RCFGraphNode[]} nodes
    * @param {string} parentNode
    * @returns {Node[]}
    */
-   getElementTypeNodes = (elementTypes: Map<string, Object>, parentNode: string): ElementTypeNode[] => {
+   getElementTypeSubGraph = (elementTypes: Map<string, Object>, parentNode: string): ElementTypeNode[] => {
       const elementTypeNodes: ElementTypeNode[] = [];
       elementTypes.forEach((value, key) => {
          var node = <ElementTypeNode>{}
@@ -613,7 +632,8 @@ export class ELKGraph {
       const elementTypesMap = new Map(Object.entries(elementTypes))
 
       const elementNodes = this.getElementNodes(elementMap, elementTypesMap, SUBGRAPHID.ELEMENTS);
-      const elementTypesNodes = this.getElementTypeNodes(elementTypesMap, SUBGRAPHID.TEMPLATES);
+      const elementTypeNodes = this.getElementTypeNodes(elementTypesMap, SUBGRAPHID.TEMPLATES);
+      const elementTypeSubGraph = this.getElementTypeSubGraph(elementTypesMap, SUBGRAPHID.TEMPLATES);
 
       // const elementTypeEdges = this.getRFEdges(this.rcfGraph.elementTypeEdges);
       // const elementEdges = this.getRFEdges(this.rcfGraph.elementEdges);
@@ -623,7 +643,7 @@ export class ELKGraph {
       // const elementTypeChild = this.createElkChild(elementTypesNodes,
       //    elementTypeEdges, SUBGRAPHID.TEMPLATES,
       //    { 'elk.direction': 'DOWN', ...elkOptions });
-      const elementTypeChild = this.createElementTypeElkChild(elementTypesNodes,
+      const elementTypeChild = this.createElementTypeElkChild(elementTypeSubGraph,
          SUBGRAPHID.TEMPLATES, { 'algorithm': 'layered' });
       // console.log("elementTypeChild is: "+JSON.stringify(elementTypeChild, null, 4))
       // const elementTypeChild = this.createElkChild(elementTypeNodes,
@@ -657,7 +677,7 @@ export class ELKGraph {
       commonEdges.concat([]), { 'algorithm': 'layered' });
       console.log("RootElkGraph is: "+JSON.stringify(rootElkGraph, null, 4))
 
-      const nodes = this.getLayoutedElements(rootElkGraph, elementNodes, elementTypesNodes);
+      const nodes = this.getLayoutedElements(rootElkGraph, elementNodes, elementTypeNodes);
       const edges = elementTypeEdges.concat(elementEdges).concat(commonEdges);
       return { nodes, edges };
    }
